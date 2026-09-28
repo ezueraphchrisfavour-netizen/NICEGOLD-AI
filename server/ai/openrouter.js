@@ -9,37 +9,32 @@ const client = apiKey
     })
   : null;
 
-async function streamResponse(messages, onText) {
+async function getResponse(messages) {
   if (!client) {
     throw new Error(
       "OPENROUTER_API_KEY is not configured."
     );
   }
 
-  const stream = await client.chat.completions.create({
-    model: "openrouter/free",
-    messages,
-    stream: true
-  });
+  const response =
+    await client.chat.completions.create({
+      model: "openrouter/free",
+      messages,
+      stream: false
+    });
 
-  let fullText = "";
+  const text =
+    response.choices?.[0]?.message?.content;
 
-  for await (const chunk of stream) {
-    const text =
-      chunk.choices?.[0]?.delta?.content || "";
-
-    if (!text) continue;
-
-    fullText += text;
-
-    if (onText) {
-      onText(text);
-    }
+  if (!text) {
+    throw new Error(
+      "OpenRouter returned an empty response."
+    );
   }
 
-  return fullText;
+  return text;
 }
 
 module.exports = {
-  streamResponse
+  getResponse
 };

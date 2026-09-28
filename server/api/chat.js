@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const {
-  streamResponse
+  getResponse
 } = require("../ai/openrouter");
 
 router.post("/", async (req, res) => {
@@ -28,7 +28,8 @@ router.post("/", async (req, res) => {
       for (const item of history) {
         if (
           item &&
-          typeof item.role === "string" &&
+          (item.role === "user" ||
+            item.role === "assistant") &&
           typeof item.content === "string"
         ) {
           messages.push({
@@ -44,73 +45,26 @@ router.post("/", async (req, res) => {
       content: message.trim()
     });
 
-    res.setHeader(
-      "Content-Type",
-      "text/event-stream"
-    );
+    const answer =
+      await getResponse(messages);
 
-    res.setHeader(
-      "Cache-Control",
-      "no-cache, no-transform"
-    );
-
-    res.setHeader(
-      "Connection",
-      "keep-alive"
-    );
-
-    res.flushHeaders();
-
-    let fullAnswer = "";
-
-    await streamResponse(
-      messages,
-      text => {
-        fullAnswer += text;
-
-        res.write(
-          `data: ${JSON.stringify({
-            type: "text",
-            text
-          })}\n\n`
-        );
-      }
-    );
-
-    res.write(
-      `data: ${JSON.stringify({
-        type: "done",
-        answer: fullAnswer
-      })}\n\n`
-    );
-
-    res.end();
+    return res.json({
+      ok: true,
+      answer
+    });
 
   } catch (error) {
     console.error(
-      "AI STREAM ERROR:",
+      "OPENROUTER ERROR:",
       error
     );
 
-    if (!res.headersSent) {
-      return res.status(500).json({
-        ok: false,
-        error:
-          error.message ||
-          "AI request failed."
-      });
-    }
-
-    res.write(
-      `data: ${JSON.stringify({
-        type: "error",
-        error:
-          error.message ||
-          "AI request failed."
-      })}\n\n`
-    );
-
-    res.end();
+    return res.status(500).json({
+      ok: false,
+      error:
+        error?.message ||
+        "AI request failed."
+    });
   }
 });
 

@@ -24,7 +24,6 @@ menuButton.addEventListener("click", () => {
 
 newChat.addEventListener("click", () => {
   conversation = [];
-
   conversationBox.innerHTML = "";
 
   messageInput.value = "";
@@ -147,8 +146,7 @@ async function sendMessage() {
   }
 
   sendButton.disabled = true;
-  sendButton.textContent =
-    "Sending";
+  sendButton.textContent = "Sending";
 
   const previousHistory = [
     ...conversation
@@ -165,8 +163,7 @@ async function sendMessage() {
   );
 
   messageInput.value = "";
-  messageInput.style.height =
-    "auto";
+  messageInput.style.height = "auto";
 
   const thinking =
     addThinkingMessage();
@@ -183,130 +180,30 @@ async function sendMessage() {
 
         body: JSON.stringify({
           message,
-          history:
-            previousHistory
+          history: previousHistory
         })
       });
 
-    if (!response.ok) {
-      let errorText =
-        "AI request failed.";
+    const data =
+      await response.json();
 
-      try {
-        const data =
-          await response.json();
-
-        errorText =
-          data.error ||
-          errorText;
-      } catch {}
-
+    if (!response.ok || !data.ok) {
       throw new Error(
-        errorText
-      );
-    }
-
-    if (!response.body) {
-      throw new Error(
-        "Streaming is not supported by this connection."
+        data.error ||
+        "AI request failed."
       );
     }
 
     thinking.remove();
 
-    const assistantBody =
-      addMessage(
-        "assistant",
-        ""
-      );
-
-    let answer = "";
-
-    const reader =
-      response.body.getReader();
-
-    const decoder =
-      new TextDecoder();
-
-    let buffer = "";
-
-    while (true) {
-      const {
-        value,
-        done
-      } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      buffer +=
-        decoder.decode(
-          value,
-          { stream: true }
-        );
-
-      const events =
-        buffer.split("\n\n");
-
-      buffer =
-        events.pop() || "";
-
-      for (const event of events) {
-        const line =
-          event
-            .split("\n")
-            .find(
-              line =>
-                line.startsWith(
-                  "data: "
-                )
-            );
-
-        if (!line) {
-          continue;
-        }
-
-        try {
-          const data =
-            JSON.parse(
-              line.slice(6)
-            );
-
-          if (
-            data.type === "text"
-          ) {
-            answer +=
-              data.text;
-
-            assistantBody.textContent =
-              answer;
-
-            conversationBox.scrollTop =
-              conversationBox.scrollHeight;
-          }
-
-          if (
-            data.type === "error"
-          ) {
-            throw new Error(
-              data.error ||
-              "AI stream failed."
-            );
-          }
-
-        } catch (parseError) {
-          console.error(
-            "Stream event error:",
-            parseError
-          );
-        }
-      }
-    }
+    addMessage(
+      "assistant",
+      data.answer
+    );
 
     conversation.push({
       role: "assistant",
-      content: answer
+      content: data.answer
     });
 
   } catch (error) {
@@ -321,20 +218,14 @@ async function sendMessage() {
 
     addMessage(
       "assistant",
-      "I couldn't complete that request. " +
-      (
-        error.message ||
-        "Please try again."
-      )
+      "I couldn't complete that request.\n\n" +
+      (error.message ||
+        "Please try again.")
     );
 
   } finally {
-    sendButton.disabled =
-      false;
-
-    sendButton.textContent =
-      "Send";
-
+    sendButton.disabled = false;
+    sendButton.textContent = "Send";
     messageInput.focus();
   }
 }
